@@ -27,23 +27,40 @@ import { ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '../../guards/auth.guards';
 import { Request } from 'express';
 import { Permission } from 'src/entities/permission.entity';
+import { UpdateInvoiceStatusDto } from './dto/update-invoice-status.dto';
 @ApiTags('invoices')
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
+  @Get()
+  async getAllInvoices() {
+    return this.invoicesService.getAllInvoices();
+  }
+
+  // =====================================
+  @Patch('status/:id')
+  async updateInvoiceStatus(
+    @Param('id') id: number,
+    @Body() updateInvoiceStatusDto: UpdateInvoiceStatusDto,
+  ) {
+    return this.invoicesService.updateInvoiceStatus(id, updateInvoiceStatusDto);
+  }
+
+  // =====================================
   @Get('check-invoice-number')
   async checkInvoiceNumber(
     @Query('invoiceNumber') invoiceNumber: string,
   ): Promise<{ exists: boolean }> {
     try {
-      const exists = await this.invoicesService.checkInvoiceNumberExists(invoiceNumber);
+      const exists =
+        await this.invoicesService.checkInvoiceNumberExists(invoiceNumber);
       return { exists };
     } catch (error) {
       throw new BadRequestException(error);
     }
   }
-  
+
   @Get(':userId')
   async getInvoicesByUser(
     @Param('userId') userId: number,
@@ -113,7 +130,7 @@ export class InvoicesController {
         },
       }),
     }),
-  )  
+  )
   async updateInvoice(
     @Param('invoiceId') invoiceId: number,
     @UploadedFile() file: Express.Multer.File,
@@ -144,26 +161,36 @@ export class InvoicesController {
     @Res() res: Response,
   ) {
     try {
-      return this.invoicesService.getDonwloadInvoicesCopy(
+      
+      const data = await this.invoicesService.getDonwloadInvoicesCopy(
         userId,
         invoiceId,
-        res
+        res,
       );
+      const { filePath, invoiceCopy, contentType,fileExtension } = data;
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${invoiceCopy.number}.${fileExtension}"`);
+      res.download(filePath);
     } catch (error) {
       throw new BadRequestException(error);
     }
   }
   @Delete(':invoiceId')
   @UseGuards(AuthGuard)
-  async deleteInvoice(@Param('invoiceId') invoiceId: number,@Req() req: Request) {
+  async deleteInvoice(
+    @Param('invoiceId') invoiceId: number,
+    @Req() req: Request,
+  ) {
     try {
       const isAdmin = req.user.isAdmin;
 
-      if(!isAdmin){
-        throw new ForbiddenException('No tiene permisos para realizar esta acción');
+      if (!isAdmin) {
+        throw new ForbiddenException(
+          'No tiene permisos para realizar esta acción',
+        );
       }
       await this.invoicesService.deleteInvoice(invoiceId);
-      return {message: 'deleted'}
+      return { message: 'deleted' };
     } catch (error) {
       throw new BadRequestException(error);
     }

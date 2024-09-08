@@ -69,9 +69,10 @@ export class DeliverablesService {
       isFolder,
       parentId,
     });
-
+    
+    
     const deliveryResult = await this.deliverableRepository.save(deliverable);
-
+    
     let ownerPermissionTypeId = 1;
     let deliverableId = deliveryResult.id;
 
@@ -185,13 +186,24 @@ export class DeliverablesService {
     return result;
 
   }
+  async getParentFolders(deliverableId: number): Promise<string> {
+    // Buscar el deliverable por ID
+    const deliverable = await this.deliverableRepository.findOneBy({ id: deliverableId });
 
-  findOne(id: number) {
-    return `This action returns a #${id} deliverable`;
-  }
+    if (!deliverable) {
+      throw new Error(`Deliverable with ID ${deliverableId} not found`);
+    }
 
-  update(id: number, updateDeliverableDto: UpdateDeliverableDto) {
-    return `This action updates a #${id} deliverable`;
+    // Inicializar la ruta actual con el nombre del deliverable
+    let currentPath = deliverable.name;
+
+    // Si hay un parentId, realizar la llamada recursiva para obtener la ruta del padre
+    if (deliverable.parentId) {
+      const parentPath = await this.getParentFolders(deliverable.parentId);
+      currentPath = parentPath + "/" + currentPath;
+    }
+
+    return currentPath;
   }
 
   async remove(id: number) {
@@ -288,18 +300,52 @@ export class DeliverablesService {
 
   async getByName(name: string, userId: string) {
     const user = await this.userRepository.findOneBy({ id: Number(userId) });
-    if (user.isAdmin)
-      return this.deliverableRepository.find({
+    if (user.isAdmin){
+      const result = await this.deliverableRepository.find({
         where: { name: ILike(`%${name}%`) },
+        relations: { permissions: {permissionType: true}, deliverableType: true, deliverableCategory: true,},
+        select:{
+          id: true,
+          parentId: true,
+          name: true,
+          isFolder: true,
+          path: true,
+          deliverableType: {name: true,},
+          deliverableCategory: {name: true,},
+          permissions: true,
+          createdAt: true,
+          updatedAt: true,
+        }
       });
+      console.log(result);
+      if (!result || result.length === 0) {
+        throw new NotFoundException('No deliverables found');
+      }
+      
+      return result;
+    }
 
     const data = await this.deliverableRepository.find({
       where: {
         name: ILike(`%${name}%`),
         permissions: { user: { id: Number(userId) } },
       },
-      relations: { permissions: true },
+      relations: { permissions: {permissionType: true},deliverableType: true, deliverableCategory: true,  },
+      select:{
+        id: true,
+        parentId: true,
+        name: true,
+        isFolder: true,
+        path: true,
+        deliverableType: {name: true,},
+        deliverableCategory: {name: true,},
+        permissions: true,
+        createdAt: true,
+        updatedAt: true,
+      }
     });
+
+    console.log(data);
 
     if (!data)
       throw new NotFoundException(`Deliverable with name ${name} not found`);
