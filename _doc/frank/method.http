@@ -1,0 +1,69 @@
+### get paginated users
+GET http://localhost:3000/users?page=16&limit=2
+
+### get all users
+GET http://localhost:3000/users
+
+### get user by ID
+GET http://localhost:3000/users/1
+
+### signin
+POST http://localhost:3000/auth/signin
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "user@example.com"
+}
+
+### signup
+POST http://localhost:3000/auth/signup
+Content-Type: application/json
+
+{
+  "email": "fgp555@gmail.com",
+  "password": "password123",
+  "Names": "John",
+  "LastName": "Doe",
+  "Position": "Manager",
+  "isAdmin": true,
+  "domain": "example.com"
+}
+
+### signin
+POST http://localhost:3000/auth/signin
+Content-Type: application/json
+
+{
+  "email": "user123@example.com",
+  "password": "password123"
+}
+
+### update user
+PUT http://localhost:3000/users/1
+Content-Type: application/json
+
+{
+  "email": "user1234@example.com",
+  "Names": "John Updated",
+  "LastName": "Doe Updated",
+  "Position": "Manager",
+  "password": "password1234",
+  "mfaEnabled": false,
+  "active": true,
+  "isAdmin": true
+}
+
+### signin
+POST http://localhost:3000/auth/signin
+Content-Type: application/json
+
+{
+  "email": "user123@example.com",
+  "password": "password1234"
+}
+
+### delete user
+DELETE http://localhost:3000/users/1
+
+
