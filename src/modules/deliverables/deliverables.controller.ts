@@ -27,12 +27,11 @@ import { DeliverablesService } from './deliverables.service';
 import { CreateDeliverableDto } from './dto/create-deliverable.dto';
 import { UpdateDeliverableDto } from './dto/update-deliverable.dto';
 import { AuthGuard } from '../../guards/auth.guards';
-import { Deliverable } from 'src/entities/deliverable.entity';
 import { Permission } from 'src/entities/permission.entity';
 import { Request } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { cwd } from 'process';
-
+import { Response } from 'express';
 @ApiTags('deliverables')
 @Controller('deliverables')
 export class DeliverablesController {
@@ -96,7 +95,10 @@ export class DeliverablesController {
     }
   }
 
+
+
   @Put('file/:deliverableId')
+  @UseGuards(AuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -128,37 +130,42 @@ export class DeliverablesController {
       createDeliverableDto.path = file ? file.path : null;
       const isFolder = false;
 
-      //Pasar el archivo de la carpeta temporal a la carpeta definitiva
-      const temporalPath = join(cwd(),'./uploads/deliverables/temporal/', file.filename);
-      
-      const parentFolders = await this.deliverablesService.getParentFolders(createDeliverableDto.parentId);
-      const newRelativePath = join('uploads/deliverables', parentFolders, file.filename);
-
-      const newPath = join(cwd(), newRelativePath);
-      
-      createDeliverableDto.path = newRelativePath;
-
-      fs.rename(temporalPath, newPath)
-      .then(() => {
-        console.log('File moved successfully!');
-      })
-      .catch(err => {
-        console.error('Error moving file:', err);
-      });
-
-      //eliminar el archivo anterior
-      const oldFileResult = await this.deliverablesService.getByDeliverableID(deliverableId);
-      let oldFileRelativePath = oldFileResult[0].path;
-      oldFileRelativePath = join('uploads/deliverables', oldFileRelativePath);
-      const oldFilePath = join(cwd(), oldFileRelativePath);
-     
-      fs.unlink(oldFilePath, (err) => {
-        if (err) {
-          console.error(err);
-        } else {
-          console.log('File deleted successfully!');
+      // Si existe el archivo, procesar
+      if (file) {
+        const temporalPath = join(cwd(), './uploads/deliverables/temporal/', file.filename);
+        
+        const parentFolders = await this.deliverablesService.getParentFolders(createDeliverableDto.parentId);
+        const newRelativePath = join('uploads/deliverables', parentFolders, file.filename);
+        const newPath = join(cwd(), newRelativePath);
+        
+        createDeliverableDto.path = newRelativePath;
+  
+        await fs.rename(temporalPath, newPath)
+          .then(() => {
+            console.log('File moved successfully!');
+          })
+          .catch(err => {
+            console.error('Error moving file:', err);
+          });
+  
+        // Eliminar el archivo anterior
+        const oldFileResult = await this.deliverablesService.getByDeliverableID(deliverableId);
+        const oldFileRelativePath = oldFileResult[0]?.path;
+        if (oldFileRelativePath) {
+          const oldFilePath = join(cwd(), 'uploads/deliverables', oldFileRelativePath);
+          await fs.unlink(oldFilePath, (err) => {
+            if (err) {
+              console.error('Error deleting old file:', err);
+            } else {
+              console.log('Old file deleted successfully!');
+            }
+          });
         }
-      });
+      } else {
+        // Si no se recibe archivo, conservar la ruta existente
+        const existingDeliverable = await this.deliverablesService.getByDeliverableID(deliverableId);
+        createDeliverableDto.path = existingDeliverable[0]?.path || null;
+      }
 
       //actualizar información en la base de datos
       return this.deliverablesService.updateDeliverable(deliverableId, createDeliverableDto, isFolder);
@@ -297,7 +304,7 @@ export class DeliverablesController {
   }
 
   @Post('link')
-  //@UseGuards(AuthGuard)
+  @UseGuards(AuthGuard)
   async createLinkDeliverable(
     @Body() createDeliverableDto: CreateDeliverableDto,
     @Req() req: Request,
@@ -340,7 +347,7 @@ export class DeliverablesController {
 
     try {
       let userId = req?.user?.id || 1;
-     
+      createDeliverableDto.deliverableTypeId = 2;
       if (!userId) {
         throw new BadRequestException('User ID is missing');
       }
@@ -395,22 +402,29 @@ export class DeliverablesController {
     }
   }
 
-  @Get('download/:id')
-  async downloadFile(@Param('id') id: string, @Res() res: Response) {
-    // const user = await this.userRepository.findOneBy({ id: userId });
-    // if (!user) throw new Error('User does not exist');
 
-    // const invoiceCopy = await this.invoiceRepository.findOneBy({ id: invoiceId });
-    // if (!invoiceCopy) throw new Error('Invoice does not exist');
+  @UseGuards(AuthGuard)
+  @Get('download/:deliverableId')
+  async downloadFile(
+  
+    @Param('invoiceId') deliverableId: number,
+    @Res() res: Response,
+    @Req() req: Request
+  ) {
 
-    // const filePath = join(__dirname, '../../upload/invoices', invoiceCopy.path);
-
-    // if (!existsSync(filePath)) {
-    //     throw new Error('Invoice file not found');
-    // }
-
-    // // Enviar el archivo directamente como respuesta
-    // return res.download(filePath, invoiceCopy.number);
+    try {
+      const userId = req.user.id;
+      const data = await this.deliverablesService.getDonwloadDeliverableCopy(
+        userId,
+        deliverableId,
+      );
+      const { filePath, deliverableCopy, contentType,fileExtension } = data;
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${deliverableCopy.name}.${fileExtension}"`);
+      res.download(filePath);
+    } catch (error) {
+      throw new BadRequestException(error);
+    }
   }
 
   @Get('file/:name')
@@ -466,6 +480,23 @@ export class DeliverablesController {
         deliverableId,
         permission,
       );
+    } catch (error) {
+      throw new BadRequestException(error);
+    }
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('uploadGoogleFile')
+  async uploadGoogleFile(@Body() body: any,
+    @Req() req: Request,
+    @Res() res: Response
+  )
+  {
+    try {
+      const userId = req.user.id;
+      const {fileName,deliverableId} = body;
+      
+      return this.deliverablesService.uploadGoogleFile(userId,deliverableId,fileName,res)
     } catch (error) {
       throw new BadRequestException(error);
     }
