@@ -11,6 +11,8 @@ import {
 import { Permission } from './permission.entity';
 import { Invoice } from './invoice.entity';
 import { Company } from './company.entity';
+import { Notification } from './notification.entity';
+
 @Entity({ name: 'users' })
 export class UserEntity {
   @PrimaryGeneratedColumn()
@@ -70,16 +72,19 @@ export class UserEntity {
   @OneToMany(() => Invoice, (invoice) => invoice.user)
   invoices: Invoice[];
 
+  @OneToMany(() => Notification, (notification) => notification.impactedUser)
+  impactedNotifications: Notification[];
+
+  @OneToMany(() => Notification, (notification) => notification.triggerUser)
+  triggeredNotifications: Notification[];
+
   @Column({ type: 'boolean', default: false })
   isAdmin: boolean;
-
-  // @ManyToOne(() => Company, (company) => company.users, { nullable: true })
-  // // @JoinColumn({ name: 'companyId' }) // Nombre de la columna en la base de datos
-  // company: Company;
 
   @ManyToOne(() => Company, (company) => company.users, { nullable: true })
   company: Company;
 
-  // @Column({ type: 'int', nullable: true })
-  // companyId: number; //
+  @Column({nullable: true,default: "https://i.postimg.cc/7hR9Z5NW/avatardashboard.png"})
+  imgProfile: string;
+
 }
