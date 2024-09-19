@@ -289,7 +289,7 @@ export class InvoicesService {
 
     // Emitir notificación al administrador
     this.notificationsGateway.emitNotificationToUser(salaAdmin, {
-      notificationType: { name: 'cargar la factura' },
+      notificationType: { name: 'editar la factura' },
       impactedUser: null,
       triggerUser: { Names: user.Names, LastName: user.LastName },
       invoice: { number: invoice.number },
@@ -302,23 +302,23 @@ export class InvoicesService {
       triggerUserId: user.id,
     });
 
-    // Emitir notificación a los usuarios en el array
-    data?.forEach(async (ImpactedUser) => {
-      const userId = ImpactedUser.id;
-      const userRoom = `${userId}`;
-      this.notificationsGateway.emitNotificationToUser(userRoom, {
-        notificationType: { name: 'editar la factura' },
-        impactedUser: { Names: user.Names, LastName: user.LastName },
-        triggerUser:{ Names: user.Names, LastName: user.LastName },
-        invoice: { number: invoice.number },
-      });
-      await this.notificationsService.createNotification({
-        invoiceId: id,
-        impactedUserId: userId,
-        notificationTypeId: 8,
-        triggerUserId: user.id,
-      });
-    });
+    // // Emitir notificación a los usuarios en el array
+    // data?.forEach(async (ImpactedUser) => {
+    //   const userId = ImpactedUser.id;
+    //   const userRoom = `${userId}`;
+    //   this.notificationsGateway.emitNotificationToUser(userRoom, {
+    //     notificationType: { name: 'editar la factura' },
+    //     impactedUser: { Names: user.Names, LastName: user.LastName },
+    //     triggerUser:{ Names: user.Names, LastName: user.LastName },
+    //     invoice: { number: invoice.number },
+    //   });
+    //   await this.notificationsService.createNotification({
+    //     invoiceId: id,
+    //     impactedUserId: userId,
+    //     notificationTypeId: 8,
+    //     triggerUserId: user.id,
+    //   });
+    // });
     return this.invoiceRepository.save(invoice);
   }
 
@@ -576,7 +576,7 @@ export class InvoicesService {
     return await Promise.all(result);
   }
 
-  // @Cron('0 12 * * *') // Cron para las 12:00 PM cada día
+  @Cron('0 12 * * *') // Cron para las 12:00 PM cada día
   // @Cron('*/5 * * * *') // Ejecutar cada 5 minutos
   async sendDueSoonEmails(): Promise<void> {
     const now = new Date();
